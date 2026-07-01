@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>NEUROVOX | Speech Emotion Engine</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&amp;family=JetBrains+Mono:wght@100..800&amp;display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface": "#000000",
+                      "background": "#000000",
+                      "primary": "#39ff14",
+                      "secondary": "#ff0033",
+                      "on-background": "#ffffff",
+                      "on-surface": "#ffffff",
+                      "on-surface-variant": "#cccccc",
+                      "outline-variant": "rgba(57, 255, 20, 0.2)",
+                      "surface-container": "#0a0a0a",
+                      "surface-container-low": "#050505",
+                      "surface-container-high": "#111111",
+                      "surface-container-highest": "#1a1a1a"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "gutter": "24px",
+                      "2xl": "64px",
+                      "xl": "40px",
+                      "md": "16px",
+                      "xs": "4px",
+                      "margin-mobile": "16px",
+                      "unit": "4px",
+                      "sm": "8px",
+                      "lg": "24px",
+                      "margin-desktop": "48px"
+              },
+              "fontFamily": {
+                      "body-lg": ["JetBrains Mono"],
+                      "body-md": ["JetBrains Mono"],
+                      "display-lg-mobile": ["Space Grotesk"],
+                      "mono-data": ["JetBrains Mono"],
+                      "label-sm": ["JetBrains Mono"],
+                      "headline-lg": ["Space Grotesk"],
+                      "display-lg": ["Space Grotesk"],
+                      "title-md": ["Space Grotesk"],
+                      "headline-lg-mobile": ["Space Grotesk"]
+              },
+              "fontSize": {
+                      "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "display-lg-mobile": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "mono-data": ["14px", {"lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                      "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+              }
+            },
+          },
+        }
+    </script>
+    <style>
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            font-family: 'JetBrains Mono', monospace;
+            overflow-x: hidden;
+        }
+
+        /* Scanline Effect */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 100;
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+        }
+        .scanline-anim {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, transparent 0%, rgba(57, 255, 20, 0.05) 50%, transparent 100%);
+            animation: scanline 8s linear infinite;
+            z-index: 99;
+            pointer-events: none;
+        }
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+
+        .deep-space-card {
+            background: rgba(10, 10, 10, 0.8);
+            border: 1px solid rgba(57, 255, 20, 0.3);
+            backdrop-filter: blur(4px);
+            box-shadow: 0 0 10px rgba(57, 255, 20, 0.1);
+            transition: all 0.3s ease;
+        }
+        .deep-space-card:hover {
+            border: 1px solid rgba(57, 255, 20, 0.6);
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.2);
+        }
+
+        .waveform-bar {
+            animation: waveform 0.8s ease-in-out infinite;
+            background-color: #39ff14;
+            box-shadow: 0 0 8px rgba(57, 255, 20, 0.8);
+        }
+        @keyframes waveform {
+            0%, 100% { height: 20%; opacity: 0.6; }
+            50% { height: 90%; opacity: 1; }
+        }
+
+        .hacker-btn {
+            background: #39ff14;
+            color: #000000;
+            transition: all 0.3s ease;
+            position: relative;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .hacker-btn:hover {
+            box-shadow: 0 0 20px #39ff14;
+            transform: scale(1.02);
+        }
+
+        .circular-gauge {
+            background: conic-gradient(#39ff14 0% 82%, #111111 82% 100%);
+            mask: radial-gradient(farthest-side, transparent 80%, black 81%);
+            -webkit-mask: radial-gradient(farthest-side, transparent 80%, black 81%);
+        }
+
+        @property --angle {
+            syntax: '<angle>';
+            initial-value: 0deg;
+            inherits: false;
+        }
+        .rotating-border-box {
+            position: relative;
+            padding: 2px;
+            border-radius: 0.5rem;
+            background: linear-gradient(var(--angle), #39ff14, #ff0033, #39ff14);
+            animation: rotate-gradient 4s linear infinite;
+        }
+        @keyframes rotate-gradient {
+            to { --angle: 360deg; }
+        }
+
+        .eq-bar {
+            transition: height 0.3s ease;
+        }
+        .eq-green { background: #39ff14; box-shadow: 0 0 10px rgba(57, 255, 20, 0.5); }
+        .eq-red { background: #ff0033; box-shadow: 0 0 10px rgba(255, 0, 51, 0.5); }
+
+        @keyframes fill-bar {
+            from { width: 0; }
+            to { width: var(--target-width); }
+        }
+        .spectrum-fill {
+            animation: fill-bar 1.5s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+        }
+
+        .model-insights-card {
+            border: 1px solid rgba(255, 0, 51, 0.3);
+            box-shadow: 0 0 15px rgba(255, 0, 51, 0.2);
+        }
+
+        /* Signal Timeline Styles */
+        .signal-grid {
+            background-image: linear-gradient(rgba(57, 255, 20, 0.05) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(57, 255, 20, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        #signalCanvas {
+            filter: drop-shadow(0 0 5px #39ff14);
+        }
+
+        /* Cursor Animation */
+        .blinking-cursor {
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink {
+            from, to { opacity: 1; }
+            50% { opacity: 0; }
+        }
+    </style>
+</head>
+<body class="dark selection:bg-primary selection:text-background">
+    <!-- Hidden input for file upload -->
+    <input type="file" id="audioUpload" accept=".wav,.mp3" style="display: none;"/>
+
+    <!-- Visual Overlays -->
+    <div class="scanlines"></div>
+    <div class="scanline-anim"></div>
+
+    <!-- TopNavBar -->
+    <header class="fixed top-0 left-0 w-full z-50 border-b border-primary/20 bg-black/80 backdrop-blur-md">
+        <div class="flex justify-between items-center w-full px-margin-desktop py-md max-w-full mx-auto">
+            <div class="flex items-center gap-xl">
+                <div class="flex items-center gap-xs">
+                    <span class="font-display-lg text-headline-lg font-bold text-primary tracking-tighter uppercase italic">NEUROVOX<span class="text-secondary">_AI</span></span>
+                </div>
+                <nav class="hidden md:flex items-center gap-lg">
+                    <a class="text-primary font-bold border-b-2 border-primary pb-1 font-body-lg text-body-lg cursor-pointer" id="nav-dashboard">[ DASHBOARD ]</a>
+                    <a class="text-white hover:text-primary transition-colors font-body-lg text-body-lg cursor-pointer" id="nav-history">[ HISTORY ]</a>
+                </nav>
+            </div>
+            <div class="flex items-center gap-md">
+                <div class="px-sm py-xs bg-primary/10 border border-primary/50 rounded flex items-center gap-xs">
+                    <div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+                    <span class="font-label-sm text-label-sm text-primary font-bold" id="node-status">NODE_ACTIVE</span>
+                </div>
+                <div class="flex gap-sm">
+                    <button class="p-xs text-white hover:text-primary transition-all duration-300">
+                        <span class="material-symbols-outlined">notifications</span>
+                    </button>
+                    <button class="p-xs text-white hover:text-primary transition-all duration-300">
+                        <span class="material-symbols-outlined">terminal</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="mt-24 px-margin-desktop pb-2xl max-w-screen-2xl mx-auto relative z-10">
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-lg">
+            <!-- Left Column: Input & Linguistics -->
+            <div class="md:col-span-4 flex flex-col gap-lg">
+                <!-- Audio Input Card -->
+                <section class="deep-space-card p-lg rounded flex flex-col gap-md">
+                    <div class="flex justify-between items-center">
+                        <h2 class="font-title-md text-title-md text-primary uppercase tracking-widest">Audio_Input</h2>
+                        <span class="material-symbols-outlined text-primary">sensors</span>
+                    </div>
+                    <div class="h-48 border border-primary/40 rounded flex flex-col items-center justify-center gap-sm relative overflow-hidden bg-black/60">
+                        <div class="flex items-center justify-center gap-xs h-16 w-full px-lg" id="waveform-container">
+                            <div class="waveform-bar w-1" style="animation-delay: 0.1s"></div>
+                            <div class="waveform-bar w-1" style="animation-delay: 0.3s"></div>
+                            <div class="waveform-bar w-1" style="animation-delay: 0.5s"></div>
+                            <div class="waveform-bar w-1" style="animation-delay: 0.2s"></div>
+                            <div class="waveform-bar w-1" style="animation-delay: 0.4s"></div>
+                            <div class="waveform-bar w-1" style="animation-delay: 0.6s"></div>
+                            <div class="waveform-bar w-1" style="animation-delay: 0.1s"></div>
+                            <div class="waveform-bar w-1" style="animation-delay: 0.3s"></div>
+                            <div class="waveform-bar w-1" style="animation-delay: 0.5s"></div>
+                            <div class="waveform-bar w-1" style="animation-delay: 0.4s"></div>
+                        </div>
+                        <p class="font-label-sm text-label-sm text-primary/80 uppercase" id="stream-status">Waiting for stream...</p>
+                        <p class="font-mono-data text-mono-data text-secondary hidden" id="rec-timer">REC 00:00</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-sm">
+                        <button class="hacker-btn py-md rounded font-title-md text-title-md flex items-center justify-center gap-xs" id="execute-btn">
+                            <span class="material-symbols-outlined">upload_file</span>
+                            UPLOAD
+                        </button>
+                        <button class="hacker-btn py-md rounded font-title-md text-title-md flex items-center justify-center gap-xs" id="record-btn" style="background:#ff0033;">
+                            <span class="material-symbols-outlined">mic</span>
+                            RECORD
+                        </button>
+                    </div>
+                    <p class="font-label-sm text-label-sm text-primary/50 uppercase text-center leading-relaxed">
+                        TIP: Speak a full sentence (3s+) with clear emotion.<br/>Single words give unreliable results.
+                    </p>
+                </section>
+
+                <!-- Linguistic Features Card -->
+                <section class="deep-space-card p-lg rounded flex flex-col gap-md">
+                    <h2 class="font-title-md text-title-md text-primary uppercase tracking-widest">Feature_Extraction</h2>
+                    <div class="grid grid-cols-3 gap-sm mb-md">
+                        <div class="bg-black p-sm rounded border border-primary/30 text-center">
+                            <div class="font-label-sm text-label-sm text-on-surface-variant uppercase">ZCR</div>
+                            <div class="font-mono-data text-mono-data text-primary" id="zcr-val">0.084</div>
+                        </div>
+                        <div class="bg-black p-sm rounded border border-primary/30 text-center">
+                            <div class="font-label-sm text-label-sm text-on-surface-variant uppercase">SPECT</div>
+                            <div class="font-mono-data text-mono-data text-primary" id="spect-val">2450</div>
+                        </div>
+                        <div class="bg-black p-sm rounded border border-primary/30 text-center">
+                            <div class="font-label-sm text-label-sm text-on-surface-variant uppercase">RMS</div>
+                            <div class="font-mono-data text-mono-data text-primary" id="rms-val">0.012</div>
+                        </div>
+                    </div>
+                    <div class="font-label-sm text-label-sm text-primary mb-xs uppercase">MFCC_Spectrum_V13</div>
+                    <div class="grid grid-cols-13 gap-1 items-end h-16 bg-black/40 p-1 rounded" id="eq-container">
+                        <div class="eq-bar eq-green w-full h-[50%] rounded-t-sm"></div>
+                        <div class="eq-bar eq-red w-full h-[35%] rounded-t-sm"></div>
+                        <div class="eq-bar eq-green w-full h-[70%] rounded-t-sm"></div>
+                        <div class="eq-bar eq-red w-full h-[25%] rounded-t-sm"></div>
+                        <div class="eq-bar eq-green w-full h-[90%] rounded-t-sm"></div>
+                        <div class="eq-bar eq-red w-full h-[45%] rounded-t-sm"></div>
+                        <div class="eq-bar eq-green w-full h-[65%] rounded-t-sm"></div>
+                        <div class="eq-bar eq-red w-full h-[30%] rounded-t-sm"></div>
+                        <div class="eq-bar eq-green w-full h-[55%] rounded-t-sm"></div>
+                        <div class="eq-bar eq-red w-full h-[40%] rounded-t-sm"></div>
+                        <div class="eq-bar eq-green w-full h-[20%] rounded-t-sm"></div>
+                        <div class="eq-bar eq-red w-full h-[80%] rounded-t-sm"></div>
+                        <div class="eq-bar eq-green w-full h-[50%] rounded-t-sm"></div>
+                    </div>
+                </section>
+
+                <!-- Signal Timeline Card (New Panel 1) -->
+                <section class="deep-space-card p-lg rounded flex flex-col gap-md">
+                    <div class="flex justify-between items-center">
+                        <h2 class="font-title-md text-title-md text-primary uppercase tracking-widest">Signal_Timeline</h2>
+                        <span class="material-symbols-outlined text-primary/40 text-sm">show_chart</span>
+                    </div>
+                    <div class="h-32 bg-black border border-primary/20 rounded relative overflow-hidden signal-grid">
+                        <canvas class="w-full h-full" id="signalCanvas"></canvas>
+                    </div>
+                    <div class="flex justify-between font-label-sm text-label-sm text-primary/40 uppercase">
+                        <span>Buffer: 1024ms</span>
+                        <span>Sample_Rate: 44.1kHz</span>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Middle Column: Main Gauge -->
+            <div class="md:col-span-5 flex flex-col gap-lg">
+                <div class="rotating-border-box flex-grow flex rounded-lg">
+                    <section class="deep-space-card w-full p-xl rounded-lg flex flex-col items-center justify-center gap-lg relative overflow-hidden flex-grow min-h-[500px]">
+                        <div class="relative w-64 h-64 flex items-center justify-center z-10">
+                            <div class="absolute inset-0 circular-gauge rounded-full rotate-[-90deg]" id="circular-gauge" style="background: conic-gradient(#39ff14 0% 82%, #111111 82% 100%)"></div>
+                            <div class="absolute inset-2 bg-black rounded-full flex flex-col items-center justify-center z-10 border border-primary/40 shadow-[0_0_20px_rgba(57,255,20,0.3)]">
+                                <div class="text-6xl mb-xs brightness-110 grayscale hover:grayscale-0 transition-all duration-500" id="emoji-text">😊</div>
+                                <div class="font-display-lg text-headline-lg text-primary drop-shadow-[0_0_8px_rgba(57,255,20,0.8)]" id="confidence-text">82%</div>
+                                <div class="font-label-sm text-label-sm text-white/60 tracking-[0.2em] uppercase">CONFIDENCE</div>
+                            </div>
+                            <div class="absolute inset-0 rounded-full blur-3xl bg-primary/10 -z-10 animate-pulse"></div>
+                        </div>
+                        <div class="text-center z-10">
+                            <h1 class="font-display-lg text-headline-lg font-bold text-primary tracking-[0.1em] drop-shadow-[0_0_12px_rgba(57,255,20,0.6)]" id="emotion-text">HAPPY</h1>
+                            <p class="font-body-lg text-body-lg text-white/80 mt-xs uppercase italic" id="precision-text">[ Classification: High Precision ]</p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-lg w-full mt-lg z-10">
+                            <div class="text-center border-r border-primary/20">
+                                <div class="font-label-sm text-label-sm text-white/50 mb-xs uppercase">VALENCE</div>
+                                <div class="font-headline-lg text-headline-lg text-primary" id="valence-val">+0.85</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="font-label-sm text-label-sm text-white/50 mb-xs uppercase">AROUSAL</div>
+                                <div class="font-headline-lg text-headline-lg text-secondary" id="arousal-val">0.42</div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Right Column: Emotional Spectrum -->
+            <div class="md:col-span-3 flex flex-col gap-lg">
+                <section class="deep-space-card p-lg rounded flex flex-col gap-lg h-full">
+                    <h2 class="font-title-md text-title-md text-primary uppercase tracking-widest">Spectral_Map</h2>
+                    <div class="flex flex-col gap-md flex-grow">
+                        <!-- Happy -->
+                        <div class="space-y-sm">
+                            <div class="flex justify-between font-label-sm text-label-sm">
+                                <span class="text-primary font-bold uppercase">Happy</span>
+                                <span class="text-primary" id="pct-happy">82%</span>
+                            </div>
+                            <div class="h-2 w-full bg-primary/10 border border-primary/20 rounded-none overflow-hidden">
+                                <div class="spectrum-fill h-full bg-[#39ff14] shadow-[0_0_12px_#39ff14]" id="bar-happy" style="--target-width: 82%; width: 82%;"></div>
+                            </div>
+                        </div>
+                        <!-- Neutral -->
+                        <div class="space-y-sm">
+                            <div class="flex justify-between font-label-sm text-label-sm">
+                                <span class="text-white uppercase">Neutral</span>
+                                <span class="text-white" id="pct-neutral">12%</span>
+                            </div>
+                            <div class="h-2 w-full bg-white/10 border border-white/20 rounded-none overflow-hidden">
+                                <div class="spectrum-fill h-full bg-white shadow-[0_0_10px_#ffffff]" id="bar-neutral" style="--target-width: 12%; width: 12%;"></div>
+                            </div>
+                        </div>
+                        <!-- Surprised -->
+                        <div class="space-y-sm">
+                            <div class="flex justify-between font-label-sm text-label-sm">
+                                <span class="text-[#ffff00] uppercase">Surprised</span>
+                                <span class="text-[#ffff00]" id="pct-surprised">4%</span>
+                            </div>
+                            <div class="h-2 w-full bg-yellow-500/10 border border-yellow-500/20 rounded-none overflow-hidden">
+                                <div class="spectrum-fill h-full bg-[#ffff00] shadow-[0_0_12px_#ffff00]" id="bar-surprised" style="--target-width: 4%; width: 4%;"></div>
+                            </div>
+                        </div>
+                        <!-- Sad -->
+                        <div class="space-y-sm">
+                            <div class="flex justify-between font-label-sm text-label-sm">
+                                <span class="text-[#0044ff] uppercase">Sad</span>
+                                <span class="text-[#0044ff]" id="pct-sad">1%</span>
+                            </div>
+                            <div class="h-2 w-full bg-blue-500/10 border border-blue-500/20 rounded-none overflow-hidden">
+                                <div class="spectrum-fill h-full bg-[#0044ff] shadow-[0_0_12px_#0044ff]" id="bar-sad" style="--target-width: 1%; width: 1%;"></div>
+                            </div>
+                        </div>
+                        <!-- Angry -->
+                        <div class="space-y-sm">
+                            <div class="flex justify-between font-label-sm text-label-sm">
+                                <span class="text-[#ff0033] uppercase">Angry</span>
+                                <span class="text-[#ff0033]" id="pct-angry">0.5%</span>
+                            </div>
+                            <div class="h-2 w-full bg-red-500/10 border border-red-500/20 rounded-none overflow-hidden">
+                                <div class="spectrum-fill h-full bg-[#ff0033] shadow-[0_0_12px_#ff0033]" id="bar-angry" style="--target-width: 0.5%; width: 0.5%;"></div>
+                            </div>
+                        </div>
+                        <!-- Disgusted -->
+                        <div class="space-y-sm">
+                            <div class="flex justify-between font-label-sm text-label-sm">
+                                <span class="text-[#9900ff] uppercase">Disgusted</span>
+                                <span class="text-[#9900ff]" id="pct-disgusted">0.2%</span>
+                            </div>
+                            <div class="h-2 w-full bg-purple-500/10 border border-purple-500/20 rounded-none overflow-hidden">
+                                <div class="spectrum-fill h-full bg-[#9900ff] shadow-[0_0_12px_#9900ff]" id="bar-disgusted" style="--target-width: 0.2%; width: 0.2%;"></div>
+                            </div>
+                        </div>
+                        <!-- Fearful -->
+                        <div class="space-y-sm">
+                            <div class="flex justify-between font-label-sm text-label-sm">
+                                <span class="text-[#ff6600] uppercase">Fearful</span>
+                                <span class="text-[#ff6600]" id="pct-fearful">0.3%</span>
+                            </div>
+                            <div class="h-2 w-full bg-orange-500/10 border border-orange-500/20 rounded-none overflow-hidden">
+                                <div class="spectrum-fill h-full bg-[#ff6600] shadow-[0_0_12px_#ff6600]" id="bar-fearful" style="--target-width: 0.3%; width: 0.3%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Status Card (New Panel 2) -->
+                    <div class="mt-lg">
+                        <section class="deep-space-card p-lg rounded flex flex-col gap-sm border-primary/40 bg-black">
+                            <h2 class="font-title-md text-title-md text-primary uppercase tracking-widest mb-xs">System_Status</h2>
+                            <div class="font-mono-data text-mono-data text-primary leading-relaxed space-y-1">
+                                <div>MODEL_VERSION: <span class="text-white" id="status-model-version">LSTM_v2.1</span></div>
+                                <div>DATASET: <span class="text-white">RAVDESS_48K</span></div>
+                                <div>INFERENCE_TIME: <span class="text-white" id="status-inference-time">42ms</span></div>
+                                <div>ACCURACY: <span class="text-white" id="status-accuracy">87.3%</span></div>
+                                <div class="flex items-center gap-1">
+                                    <span>STATUS:</span>
+                                    <span class="text-white bg-primary/20 px-1" id="status-msg">ALL_SYSTEMS_NOMINAL</span>
+                                    <span class="w-2 h-4 bg-primary blinking-cursor"></span>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <div class="mt-lg pt-lg border-t border-primary/20">
+                        <div class="model-insights-card bg-red-500/5 p-md rounded border border-secondary/30">
+                            <div class="flex items-center gap-sm mb-xs">
+                                <span class="material-symbols-outlined text-secondary text-sm animate-pulse">terminal</span>
+                                <span class="font-label-sm text-label-sm text-secondary uppercase font-bold tracking-tighter">Insights_Kernel</span>
+                            </div>
+                            <p class="font-body-md text-body-md text-white/90 leading-relaxed italic" id="insights-val">
+                                PROSODY ANALYSIS: High-energy Joy detected. Semantic alignment 0.94. Matrix recalibration complete.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+        <!-- Analysis History + Analytics (full width) -->
+        <section class="deep-space-card p-lg rounded flex flex-col gap-lg mt-lg" id="history-section">
+            <div class="flex justify-between items-center">
+                <h2 class="font-title-md text-title-md text-primary uppercase tracking-widest flex items-center gap-sm">
+                    <span class="material-symbols-outlined">history</span>Analysis_Log // Session_History
+                </h2>
+                <button class="px-md py-xs border border-secondary/60 text-secondary rounded font-label-sm text-label-sm uppercase tracking-widest hover:bg-secondary/10 transition-all" id="clear-history-btn">
+                    <span class="material-symbols-outlined align-middle text-sm">delete</span> Clear_Log
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-lg">
+                <!-- Analytics summary -->
+                <div class="md:col-span-4 flex flex-col gap-md">
+                    <div class="grid grid-cols-3 gap-sm">
+                        <div class="bg-black p-md rounded border border-primary/30 text-center">
+                            <div class="font-label-sm text-label-sm text-on-surface-variant uppercase">Total</div>
+                            <div class="font-headline-lg text-headline-lg text-primary" id="stat-total">0</div>
+                        </div>
+                        <div class="bg-black p-md rounded border border-primary/30 text-center">
+                            <div class="font-label-sm text-label-sm text-on-surface-variant uppercase">Top</div>
+                            <div class="font-headline-lg text-2xl" id="stat-top">—</div>
+                        </div>
+                        <div class="bg-black p-md rounded border border-primary/30 text-center">
+                            <div class="font-label-sm text-label-sm text-on-surface-variant uppercase">Avg_Conf</div>
+                            <div class="font-headline-lg text-headline-lg text-primary" id="stat-avgconf">0%</div>
+                        </div>
+                    </div>
+                    <div class="bg-black/40 p-md rounded border border-primary/20">
+                        <div class="font-label-sm text-label-sm text-primary/70 uppercase mb-sm">Emotion_Distribution</div>
+                        <div class="flex flex-col gap-sm" id="stat-counts">
+                            <p class="font-label-sm text-label-sm text-white/40 uppercase">No data yet.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History list -->
+                <div class="md:col-span-8">
+                    <div class="border border-primary/20 rounded bg-black/40 max-h-72 overflow-y-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="sticky top-0 bg-surface-container-high">
+                                <tr class="font-label-sm text-label-sm text-primary/70 uppercase">
+                                    <th class="p-sm">#</th>
+                                    <th class="p-sm">Emotion</th>
+                                    <th class="p-sm">Confidence</th>
+                                    <th class="p-sm">Source</th>
+                                    <th class="p-sm">Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-list" class="font-mono-data text-mono-data"></tbody>
+                        </table>
+                        <p class="p-lg text-center font-label-sm text-label-sm text-white/40 uppercase" id="history-empty">
+                            No analyses yet — run an UPLOAD or RECORD to populate the log.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer / Latency Bar -->
+    <footer class="fixed bottom-0 left-0 w-full z-50 border-t border-primary/20 bg-black/95 py-sm px-margin-desktop">
+        <div class="flex justify-between items-center w-full max-w-full mx-auto">
+            <div class="flex items-center gap-lg">
+                <span class="font-mono-data text-mono-data text-primary tracking-[0.2em] font-bold" id="footer-lms">L_MS: 042 • REL: 4.12.0_STABLE • SYS_OK</span>
+            </div>
+            <div class="flex items-center gap-md font-label-sm text-label-sm text-primary/60">
+                <a class="hover:text-primary transition-colors uppercase" href="#">System_Log</a>
+                <span class="opacity-30">|</span>
+                <a class="hover:text-primary transition-colors uppercase" href="#">Doc_Core</a>
+                <span class="opacity-30">|</span>
+                <a class="hover:text-primary transition-colors uppercase" href="#">Admin_Support</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Audio Waveform Animation Randomizer
+        const bars = document.querySelectorAll('.waveform-bar');
+        bars.forEach(bar => {
+            bar.style.animationDuration = (0.4 + Math.random() * 0.4) + 's';
+        });
+
+        // Dynamic EQ (MFCC) animation logic
+        const eqBars = document.querySelectorAll('.eq-bar');
+        function animateEQ() {
+            eqBars.forEach(bar => {
+                const height = 15 + Math.random() * 85;
+                bar.style.height = height + '%';
+                bar.style.transition = `height ${0.1 + Math.random() * 0.2}s cubic-bezier(0.4, 0, 0.2, 1)`;
+            });
+            setTimeout(animateEQ, 200);
+        }
+        animateEQ();
+
+        // Signal Timeline Real-time Graph
+        const canvas = document.getElementById('signalCanvas');
+        const ctx = canvas.getContext('2d');
+        let points = Array(100).fill(0).map(() => Math.random() * 20 - 10);
+
+        function drawSignal() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#39ff14';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            const sliceWidth = canvas.width / (points.length - 1);
+            let x = 0;
+
+            for (let i = 0; i < points.length; i++) {
+                const v = points[i] / 50;
+                const y = canvas.height / 2 + (v * canvas.height / 2);
+
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+                x += sliceWidth;
+            }
+
+            ctx.stroke();
+
+            // Shift points for scrolling effect
+            points.push(Math.sin(Date.now() / 100) * (5 + Math.random() * 15) + (Math.random() * 10 - 5));
+            points.shift();
+
+            requestAnimationFrame(drawSignal);
+        }
+        drawSignal();
+
+        // Console message on load
+        console.log('%c [SYS] EMOTIONAI OS V4.12.0 BOOT COMPLETE ', 'background: #39ff14; color: #000; font-weight: bold;');
+
+        // Backend Integration
+        const API_URL = "http://localhost:8000";
+        const executeBtn = document.getElementById('execute-btn');
+        const fileInput = document.getElementById('audioUpload');
+        const streamStatus = document.getElementById('stream-status');
+
+        // Emoji Map
+        const EMOJI_MAP = {
+            "happy": "😊",
+            "neutral": "😐",
+            "sad": "😢",
+            "angry": "😡",
+            "fearful": "😨",
+            "disgusted": "🤢",
+            "surprised": "😲"
+        };
+
+        // ---- Analysis History + Analytics (persisted in localStorage) --------
+        const HISTORY_KEY = 'neurovox_history';
+        const EMOTION_COLORS = {
+            happy: '#39ff14', neutral: '#ffffff', surprised: '#ffff00',
+            sad: '#0044ff', angry: '#ff0033', disgusted: '#9900ff', fearful: '#ff6600'
+        };
+
+        function loadHistory() {
+            try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+            catch (e) { return []; }
+        }
+        function saveHistory(h) {
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 50)));
+        }
+        function addHistory(entry) {
+            const h = loadHistory();
+            h.unshift(entry);
+            saveHistory(h);
+            renderHistory();
+        }
+        function renderHistory() {
+            const h = loadHistory();
+            const listEl = document.getElementById('history-list');
+            const emptyEl = document.getElementById('history-empty');
+            listEl.innerHTML = '';
+
+            if (h.length === 0) {
+                emptyEl.style.display = 'block';
+            } else {
+                emptyEl.style.display = 'none';
+                h.forEach((e, i) => {
+                    const color = EMOTION_COLORS[e.emotion.toLowerCase()] || '#39ff14';
+                    const t = new Date(e.time);
+                    const timeStr = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    const row = document.createElement('tr');
+                    row.className = 'border-t border-primary/10 hover:bg-primary/5';
+                    row.innerHTML = `
+                        <td class="p-sm text-white/40">${h.length - i}</td>
+                        <td class="p-sm font-bold uppercase" style="color:${color}">${e.emoji} ${e.emotion}</td>
+                        <td class="p-sm text-primary">${e.confidence}%</td>
+                        <td class="p-sm text-white/60">${e.source}</td>
+                        <td class="p-sm text-white/40">${timeStr}</td>`;
+                    listEl.appendChild(row);
+                });
+            }
+
+            // Analytics
+            document.getElementById('stat-total').innerText = h.length;
+            if (h.length === 0) {
+                document.getElementById('stat-top').innerText = '—';
+                document.getElementById('stat-avgconf').innerText = '0%';
+                document.getElementById('stat-counts').innerHTML =
+                    '<p class="font-label-sm text-label-sm text-white/40 uppercase">No data yet.</p>';
+                return;
+            }
+            const counts = {};
+            let confSum = 0;
+            h.forEach(e => {
+                const k = e.emotion.toLowerCase();
+                counts[k] = (counts[k] || 0) + 1;
+                confSum += parseFloat(e.confidence) || 0;
+            });
+            const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+            document.getElementById('stat-top').innerText = EMOJI_MAP[top[0]] || '—';
+            document.getElementById('stat-avgconf').innerText = `${(confSum / h.length).toFixed(0)}%`;
+
+            const countsEl = document.getElementById('stat-counts');
+            countsEl.innerHTML = '';
+            Object.entries(counts).sort((a, b) => b[1] - a[1]).forEach(([emo, cnt]) => {
+                const color = EMOTION_COLORS[emo] || '#39ff14';
+                const pct = ((cnt / h.length) * 100).toFixed(0);
+                const wrap = document.createElement('div');
+                wrap.className = 'space-y-1';
+                wrap.innerHTML = `
+                    <div class="flex justify-between font-label-sm text-label-sm uppercase">
+                        <span style="color:${color}">${EMOJI_MAP[emo] || ''} ${emo}</span>
+                        <span class="text-white/60">${cnt} (${pct}%)</span>
+                    </div>
+                    <div class="h-1.5 w-full bg-white/10 rounded overflow-hidden">
+                        <div class="h-full rounded" style="width:${pct}%;background:${color};box-shadow:0 0 8px ${color}"></div>
+                    </div>`;
+                countsEl.appendChild(wrap);
+            });
+        }
+
+        document.getElementById('clear-history-btn').addEventListener('click', () => {
+            if (confirm('Clear the entire analysis log?')) {
+                localStorage.removeItem(HISTORY_KEY);
+                renderHistory();
+            }
+        });
+
+        // Nav links -> smooth scroll
+        document.getElementById('nav-history').addEventListener('click', () => {
+            document.getElementById('history-section').scrollIntoView({ behavior: 'smooth' });
+        });
+        document.getElementById('nav-dashboard').addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        renderHistory();
+
+        // Query server health on load to verify API connection
+        async function checkHealth() {
+            try {
+                const res = await fetch(`${API_URL}/health`);
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('status-model-version').innerText = data.version;
+                    document.getElementById('status-accuracy').innerText = data.accuracy;
+                    document.getElementById('node-status').innerText = "NODE_ACTIVE";
+                    document.getElementById('status-msg').innerText = "ALL_SYSTEMS_NOMINAL";
+                    console.log("[SYS] Backend connected successfully:", data);
+                } else {
+                    document.getElementById('node-status').innerText = "NODE_OFFLINE";
+                    document.getElementById('status-msg').innerText = "MODEL_UNAVAILABLE";
+                }
+            } catch (err) {
+                console.error("[SYS] Backend connection error:", err);
+                document.getElementById('node-status').innerText = "NODE_OFFLINE";
+                document.getElementById('status-msg').innerText = "CONNECTION_FAILED";
+            }
+        }
+        checkHealth();
+
+        const recordBtn = document.getElementById('record-btn');
+        const recTimer = document.getElementById('rec-timer');
+
+        // ---- Browser-side WAV encoder ----------------------------------------
+        // Decodes any uploaded/recorded audio (wav, mp3, webm, ogg) via the Web
+        // Audio API and re-encodes it to a clean 16-bit mono WAV. This guarantees
+        // the backend always receives a format librosa/soundfile can read without
+        // needing ffmpeg installed — the usual cause of "failed analysis".
+        async function decodeBlob(blob) {
+            const arrayBuf = await blob.arrayBuffer();
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            const audioCtx = new AudioCtx();
+            const audioBuf = await audioCtx.decodeAudioData(arrayBuf);
+            audioCtx.close();
+            return audioBuf;
+        }
+
+        function encodeWav(audioBuf) {
+            // Mix down to mono
+            const numCh = audioBuf.numberOfChannels;
+            const len = audioBuf.length;
+            const samples = new Float32Array(len);
+            for (let ch = 0; ch < numCh; ch++) {
+                const data = audioBuf.getChannelData(ch);
+                for (let i = 0; i < len; i++) samples[i] += data[i] / numCh;
+            }
+
+            const sampleRate = audioBuf.sampleRate;
+            const buffer = new ArrayBuffer(44 + len * 2);
+            const view = new DataView(buffer);
+            const writeStr = (off, str) => { for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i)); };
+
+            writeStr(0, 'RIFF');
+            view.setUint32(4, 36 + len * 2, true);
+            writeStr(8, 'WAVE');
+            writeStr(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);          // PCM
+            view.setUint16(22, 1, true);          // mono
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeStr(36, 'data');
+            view.setUint32(40, len * 2, true);
+
+            let off = 44;
+            for (let i = 0; i < len; i++, off += 2) {
+                let s = Math.max(-1, Math.min(1, samples[i]));
+                view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            }
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        // ---- Shared analysis routine -----------------------------------------
+        let busy = false;
+        async function analyzeAudio(blob, label) {
+            if (busy) return;
+            busy = true;
+            const shortLabel = label.substring(0, 15);
+            streamStatus.innerText = `LOADING: ${shortLabel}...`;
+            executeBtn.disabled = true;
+            recordBtn.disabled = true;
+
+            try {
+                streamStatus.innerText = `DECODING: ${shortLabel}...`;
+                const audioBuf = await decodeBlob(blob);
+
+                // Duration guard — clips that are too short give garbage predictions.
+                if (audioBuf.duration < 1.2) {
+                    throw new Error("SHORT_CLIP");
+                }
+
+                const wavBlob = encodeWav(audioBuf);
+
+                const formData = new FormData();
+                formData.append("file", wavBlob, "audio.wav");
+
+                streamStatus.innerText = `ANALYZING: ${shortLabel}...`;
+                const response = await fetch(`${API_URL}/predict`, {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    let detail = "Prediction failed";
+                    try { detail = (await response.json()).detail || detail; } catch (e) {}
+                    throw new Error(detail);
+                }
+
+                const result = await response.json();
+                console.log("[SYS] Prediction result:", result);
+
+                // Update text values
+                streamStatus.innerText = `ANALYSIS_COMPLETE: ${shortLabel}`;
+                document.getElementById('emotion-text').innerText = result.emotion.toUpperCase();
+                document.getElementById('confidence-text').innerText = `${result.confidence}%`;
+                
+                // Update Emoji
+                const emoji = EMOJI_MAP[result.emotion.toLowerCase()] || "😊";
+                document.getElementById('emoji-text').innerText = emoji;
+
+                // Update Gauge
+                const circularGauge = document.getElementById('circular-gauge');
+                circularGauge.style.background = `conic-gradient(#39ff14 0% ${result.confidence}%, #111111 ${result.confidence}% 100%)`;
+
+                // Update Valence and Arousal
+                document.getElementById('valence-val').innerText = (result.valence >= 0 ? "+" : "") + result.valence.toFixed(2);
+                document.getElementById('arousal-val').innerText = result.arousal.toFixed(2);
+
+                // Update Feature metrics
+                document.getElementById('zcr-val').innerText = result.zcr_mean.toFixed(4);
+                document.getElementById('spect-val').innerText = result.spectral_centroid;
+                document.getElementById('rms-val').innerText = result.rms.toFixed(4);
+
+                // Update System status & Footer
+                document.getElementById('status-inference-time').innerText = `${result.inference_time_ms}ms`;
+                document.getElementById('footer-lms').innerText = `L_MS: ${String(result.inference_time_ms).padStart(3, '0')} • REL: 4.12.0_STABLE • SYS_OK`;
+
+                // Update Spectral Map bars
+                Object.keys(result.probabilities).forEach(emotion => {
+                    const key = emotion.toLowerCase();
+                    const prob = result.probabilities[emotion];
+                    const pctEl = document.getElementById(`pct-${key}`);
+                    const barEl = document.getElementById(`bar-${key}`);
+                    if (pctEl) pctEl.innerText = `${prob.toFixed(1)}%`;
+                    if (barEl) {
+                        barEl.style.setProperty('--target-width', `${prob}%`);
+                        barEl.style.width = `${prob}%`;
+                    }
+                });
+
+                // Update Insights Kernel
+                const intensityText = result.confidence > 70 ? "High-energy" : "Subtle";
+                document.getElementById('insights-val').innerText = `PROSODY ANALYSIS: ${intensityText} ${result.emotion} detected. Inference time ${result.inference_time_ms}ms. Matrix recalibration complete.`;
+
+                // Log to session history
+                addHistory({
+                    emotion: result.emotion,
+                    emoji: EMOJI_MAP[result.emotion.toLowerCase()] || "🎙️",
+                    confidence: result.confidence,
+                    source: label === "mic_recording" ? "MIC" : "FILE",
+                    time: new Date().toISOString()
+                });
+
+            } catch (err) {
+                console.error("[SYS] Error during analysis:", err);
+                streamStatus.innerText = "ERROR DURING ANALYSIS";
+                let msg = err.message;
+                if (msg === "SHORT_CLIP") {
+                    msg = "Clip too short. Please record/upload at least ~2 seconds of clear speech (a full sentence).";
+                } else if (err.name === 'EncodingError' || /decodeAudio/i.test(msg)) {
+                    msg = "Could not decode this audio file. Try a .wav or .mp3.";
+                } else if (/Failed to fetch/i.test(msg)) {
+                    msg = "Cannot reach the backend at " + API_URL + ". Is the server running?";
+                }
+                alert(`Analysis error: ${msg}`);
+            } finally {
+                executeBtn.disabled = false;
+                recordBtn.disabled = false;
+                fileInput.value = ""; // clear selection
+                busy = false;
+            }
+        }
+
+        // ---- Upload flow ------------------------------------------------------
+        executeBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) analyzeAudio(file, file.name);
+        });
+
+        // ---- Record flow ------------------------------------------------------
+        let mediaRecorder = null;
+        let recChunks = [];
+        let recStream = null;
+        let recSeconds = 0;
+        let recInterval = null;
+        let isRecording = false;
+
+        function setRecordingUI(on) {
+            isRecording = on;
+            if (on) {
+                recordBtn.innerHTML = '<span class="material-symbols-outlined">stop</span> STOP';
+                recordBtn.style.background = '#39ff14';
+                recTimer.classList.remove('hidden');
+                streamStatus.innerText = "RECORDING...";
+            } else {
+                recordBtn.innerHTML = '<span class="material-symbols-outlined">mic</span> RECORD';
+                recordBtn.style.background = '#ff0033';
+                recTimer.classList.add('hidden');
+            }
+        }
+
+        async function startRecording() {
+            try {
+                recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch (err) {
+                console.error("[SYS] Mic access error:", err);
+                alert("Microphone access denied or unavailable. Please allow mic access.");
+                return;
+            }
+            recChunks = [];
+            recSeconds = 0;
+            mediaRecorder = new MediaRecorder(recStream);
+            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recChunks.push(e.data); };
+            mediaRecorder.onstop = () => {
+                clearInterval(recInterval);
+                recStream.getTracks().forEach(t => t.stop());
+                setRecordingUI(false);
+                if (recChunks.length === 0) { streamStatus.innerText = "NO AUDIO CAPTURED"; return; }
+                const blob = new Blob(recChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+                analyzeAudio(blob, "mic_recording");
+            };
+            mediaRecorder.start();
+            setRecordingUI(true);
+            recTimer.innerText = "REC 00:00";
+            recInterval = setInterval(() => {
+                recSeconds++;
+                const m = String(Math.floor(recSeconds / 60)).padStart(2, '0');
+                const s = String(recSeconds % 60).padStart(2, '0');
+                recTimer.innerText = `REC ${m}:${s}`;
+            }, 1000);
+        }
+
+        recordBtn.addEventListener('click', () => {
+            if (busy) return;
+            if (isRecording) {
+                mediaRecorder.stop();
+            } else {
+                startRecording();
+            }
+        });
+    </script>
+</body>
+</html>
